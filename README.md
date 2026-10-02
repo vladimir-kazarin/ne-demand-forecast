@@ -72,7 +72,7 @@ when its **done-when** check passes.
 - [x] Repository, project scaffold, CI
 - [x] Confirm the weather API offers archived forecasts for the backfill period ([ADR 0002](docs/adr/0002-data-sources-and-forecast-vintages.md))
 - [x] AWS storage and GitHub OIDC role provisioned with Terraform ([ADR 0003](docs/adr/0003-terraform-for-aws.md))
-- [ ] Register an ISO Express account (not needed for v1: public files suffice)
+- [x] Register an ISO Express account
 - [x] Backfill two years of load, ISO forecast, and forecast weather into raw storage
 - [x] Start archiving the ISO forecast and weather forecast as issued
 - [x] **Done when:** historical load and weather are in storage
