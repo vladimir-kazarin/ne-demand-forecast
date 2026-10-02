@@ -23,3 +23,11 @@ makes raw data append-only; bucket versioning recovers accidental overwrites.
 
 Infrastructure is reproducible and reviewable in pull requests. A plan/apply CI workflow is
 deferred to Phase 4; until then `terraform apply` is run locally with the `terraform` profile.
+
+Terraform runs as the shared `terraform-deployer` role, which is managed outside this repo. It
+needed one addition: an inline policy `ne-demand-budgets` allowing view, modify, and tag
+operations on `arn:aws:budgets::541371124125:budget/ne-demand-*` only. AWS managed Budgets
+policies were rejected as too broad (`iam:PassRole` on `*`, Organizations account closure).
+
+The budget filters on the `Project` tag, which must be activated as a cost allocation tag in
+Billing before the budget counts any spend.
