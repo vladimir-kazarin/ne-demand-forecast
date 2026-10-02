@@ -31,6 +31,7 @@ Weather fcst ─┘                                                             
 | `src/ne_demand/monitoring/` | Error, drift, freshness, alerts |
 | `dashboard/` | Streamlit prediction app and ops dashboard |
 | `configs/` | Training configs |
+| `infra/` | Terraform for AWS (state bucket, data bucket, GitHub OIDC role, budget) |
 | `docs/adr/` | Decision records |
 | `docs/incidents.md` | Incident log |
 
@@ -43,6 +44,20 @@ uv sync --all-extras          # or: make install
 cp .env.example .env          # add ISO Express credentials
 uv run ne-demand check-config
 make test
+
+# backfill raw history (resumable) and snapshot today's forecasts
+uv run ne-demand backfill --start 2024-10-01 --end 2026-10-01
+uv run ne-demand archive
+```
+
+### Infrastructure
+
+```bash
+export AWS_PROFILE=terraform
+cd infra/bootstrap && terraform init && terraform apply          # once: state bucket
+cd ../aws && cp terraform.tfvars.example terraform.tfvars          # set alert_email
+terraform init -backend-config="bucket=$(terraform -chdir=../bootstrap output -raw state_bucket)"
+terraform apply
 ```
 
 All timestamps are UTC. Calendar features are computed in `America/New_York` so 23- and 25-hour
@@ -54,9 +69,10 @@ v1 is phases 0–2 (about one week). The full pipeline is about three to four we
 when its **done-when** check passes.
 
 ### Phase 0 — Setup
-- [ ] Register an ISO Express account
 - [x] Repository, project scaffold, CI
-- [ ] Confirm the weather API offers archived forecasts for the backfill period
+- [x] Confirm the weather API offers archived forecasts for the backfill period ([ADR 0002](docs/adr/0002-data-sources-and-forecast-vintages.md))
+- [ ] AWS storage and GitHub OIDC role provisioned with Terraform ([ADR 0003](docs/adr/0003-terraform-for-aws.md))
+- [ ] Register an ISO Express account (not needed for v1: public files suffice)
 - [ ] Backfill two years of load, ISO forecast, and forecast weather into raw storage
 - [ ] Start archiving the ISO forecast and weather forecast as issued
 - [ ] **Done when:** historical load and weather are in storage

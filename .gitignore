@@ -17,3 +17,11 @@ data/*
 mlruns/
 mlartifacts/
 models/
+
+# terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
