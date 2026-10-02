@@ -5,7 +5,7 @@ unattended, with every model decision visible on a public dashboard. The operati
 the product; the forecast is its workload. Forecasts are benchmarked against ISO New England's
 own load forecast and a naive same-hour-last-week baseline.
 
-> Status: **Milestone 0 — setup.** Live dashboard link and architecture diagram land in milestone 2.
+> Status: **Phase 0 — setup.** Live dashboard link and architecture diagram land in phase 2.
 
 ## Pipeline
 
@@ -48,15 +48,68 @@ make test
 All timestamps are UTC. Calendar features are computed in `America/New_York` so 23- and 25-hour
 daylight-saving days are handled.
 
-## Milestones
+## Roadmap
 
-| # | Scope | Status |
-| --- | --- | --- |
-| 0 | ISO Express account, repository, two-year backfill | in progress |
-| 1 | Ingestion, validation, features, LightGBM, daily forecast, naive baseline | |
-| 2 | MLflow tracking and registry, deployed prediction app — **v1 live** | |
-| 3 | FastAPI service, Docker, public deployment, load test | |
-| 4 | CI/CD, evaluation gate, rollback | |
-| 5 | Weekly retraining through the gate | |
-| 6 | Monitoring and alerts | |
-| 7 | Architecture diagram, decision records, failure demos, quickstart | |
+v1 is phases 0–2 (about one week). The full pipeline is about three to four weeks. A phase is done
+when its **done-when** check passes.
+
+### Phase 0 — Setup
+- [ ] Register an ISO Express account
+- [x] Repository, project scaffold, CI
+- [ ] Confirm the weather API offers archived forecasts for the backfill period
+- [ ] Backfill two years of load, ISO forecast, and forecast weather into raw storage
+- [ ] Start archiving the ISO forecast and weather forecast as issued
+- [ ] **Done when:** historical load and weather are in storage
+
+### Phase 1 — Batch forecast with validation
+- [ ] Hourly ingestion job: idempotent, retries, alerts on failure
+- [ ] Pandera validation: schema, missing hours, duplicates, value ranges
+- [ ] Features: lagged load (24 h, 168 h), forecast temperature, calendar
+- [ ] LightGBM training from config
+- [ ] Daily batch forecast of 24 hourly values, stored with model version
+- [ ] Naive baseline (same hour last week) scored alongside
+- [ ] **Done when:** a broken column fails the pipeline with a clear error
+
+### Phase 2 — Tracking, registry, first dashboard (**v1 live**)
+- [ ] MLflow logging of params, metrics, data window, git commit
+- [ ] Model registry with `candidate` and `production` aliases
+- [ ] Deployed prediction app with the forecast page
+- [ ] **Done when:** the production version traces to its data and commit
+
+### Phase 3 — Serving API
+- [ ] FastAPI service with `/health` and `/predict`
+- [ ] Docker image, public scale-to-zero deployment
+- [ ] Predict form in the app
+- [ ] Load test: local p95 under 200 ms
+- [ ] **Done when:** a bad model path fails at startup
+
+### Phase 4 — CI/CD, gate, rollback
+- [ ] PR workflow: lint, unit tests, training smoke test
+- [ ] Merge workflow: build image, register candidate
+- [ ] Evaluation gate on a fixed holdout (MAPE, set improvement margin)
+- [ ] One-command rollback workflow, logged
+- [ ] **Done when:** a degraded model is rejected, and rollback takes under 5 minutes
+
+### Phase 5 — Scheduled retraining
+- [ ] Weekly retrain on a rolling window, sent through the gate
+- [ ] **Done when:** the log shows promoted and rejected weeks, each with a reason
+
+### Phase 6 — Monitoring and alerts
+- [ ] Forecast error tracking (model, ISO, naive)
+- [ ] Input drift with Evidently
+- [ ] Data freshness and job-failure checks
+- [ ] Slack or email alerts
+- [ ] **Done when:** an injected input shift fires an alert within one cycle
+
+### Phase 7 — Showcase
+- [ ] Architecture diagram
+- [ ] Decision records for main tool choices
+- [ ] Recorded failure demos: validation failure, rejected model, rollback, drift alert
+- [ ] Quickstart and incident log
+- [ ] **Done when:** a stranger runs it locally within 60 minutes
+
+### Later iterations
+- [ ] All eight New England load zones
+- [ ] Day-ahead price forecasting and a paper battery trading simulation
+- [ ] Airflow, Kubernetes, and Terraform
+- [ ] PyTorch challenger model
