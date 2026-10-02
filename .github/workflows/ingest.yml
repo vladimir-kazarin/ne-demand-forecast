@@ -1,8 +1,8 @@
-name: Archive forecasts
+name: Ingest
 
-# Captures the ISO-NE load forecast and the weather forecast as issued.
-# Historical ISO files keep only same-day vintages, so the day-ahead
-# benchmark exists only if it is archived live.
+# Hourly: recent ISO-NE load, day-ahead weather, and the live ISO and weather
+# forecasts as issued. Historical ISO files keep only same-day vintages, so the
+# day-ahead benchmark exists only because this job archives it (ADR 0002).
 
 on:
   schedule:
@@ -14,11 +14,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: archive
+  group: data-root
   cancel-in-progress: false
 
 jobs:
-  archive:
+  ingest:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -31,6 +31,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: us-east-1
       - run: uv sync --locked --no-dev
-      - run: uv run ne-demand archive
+      - run: uv run ne-demand ingest
         env:
           NE_DATA_ROOT: ${{ vars.NE_DATA_ROOT }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

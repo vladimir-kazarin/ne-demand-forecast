@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
 from pathlib import Path
 
 import pytest
@@ -11,7 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_shipped_train_config_loads():
     cfg = load_train_config(ROOT / "configs" / "lightgbm_v1.yaml")
-    assert cfg.lag_hours == [24, 168]
+    assert cfg.lag_hours == [24, 48, 168]
+    assert cfg.issue_time_local == time(10, 30)
 
 
 def test_raw_partition_path():

@@ -89,3 +89,24 @@ def archive(root: str) -> list[str]:
         ),
         write_raw(weather.fetch_forecast(), root, ARCHIVE_SOURCES[1], now.date(), now),
     ]
+
+
+def ingest_recent(root: str) -> list[str]:
+    """Hourly job: snapshot yesterday's and today's load plus the live forecasts.
+
+    Each run adds new raw files; processing keeps the latest value per interval,
+    so overlapping snapshots never create duplicates downstream.
+    """
+    now = datetime.now(UTC)
+    today_local = pd.Timestamp(now).tz_convert("America/New_York").date()
+    paths = [
+        write_raw(isone.fetch_load(day), root, "isone_load", day, now)
+        for day in (today_local - timedelta(days=1), today_local)
+    ]
+    # Day-ahead weather for training, partitioned by UTC date like the backfill.
+    today_utc = now.date()
+    prev = weather.fetch_previous_runs(today_utc - timedelta(days=1), today_utc)
+    for day in (today_utc - timedelta(days=1), today_utc):
+        part = prev[prev["time"].dt.date == day]
+        paths.append(write_raw(part, root, "weather_previous_runs", day, now))
+    return paths + archive(root)

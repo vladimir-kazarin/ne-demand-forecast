@@ -1,0 +1,40 @@
+name: Daily forecast
+
+# Issue time is 10:30 America/New_York (ADR 0004). Cron is UTC, so run at both
+# 14:35 and 15:35 UTC; `--scheduled` skips the run that is before 10:30 local
+# or after tomorrow's forecast already exists.
+
+on:
+  schedule:
+    - cron: "35 14,15 * * *"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: data-root
+  cancel-in-progress: false
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NE_DATA_ROOT: ${{ vars.NE_DATA_ROOT }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+      - run: uv sync --locked --no-dev
+      - name: Refresh inputs
+        run: uv run ne-demand ingest
+      - name: Forecast tomorrow
+        run: uv run ne-demand forecast --scheduled

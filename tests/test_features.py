@@ -37,7 +37,38 @@ def test_lags_never_use_data_after_issue_time():
     feats = lag_features(load, target, [24, 168], issue_time)
 
     for lag in (24, 168):
-        source = target - pd.Timedelta(hours=lag)
+        source_end = target - pd.Timedelta(hours=lag) + pd.Timedelta(hours=1)
         col = feats[f"load_lag_{lag}h"]
-        assert col[source > issue_time].isna().all()
-        assert col[source <= issue_time].notna().all()
+        assert col[source_end > issue_time].isna().all()
+        assert col[source_end <= issue_time].notna().all()
+
+
+def test_target_hours_follow_local_days():
+    from datetime import date
+
+    from ne_demand.features.build import target_hours
+
+    assert len(target_hours(date(2026, 3, 8))) == 23
+    assert len(target_hours(date(2026, 11, 1))) == 25
+    assert len(target_hours(date(2026, 6, 1))) == 24
+
+
+def test_training_frame_uses_only_data_known_at_each_days_issue_time(tables):
+    from datetime import date, time, timedelta
+
+    from ne_demand.features.build import scheduled_issue_time, training_frame
+
+    load_df, weather_df = tables
+    load = load_df.set_index("time")["load_mw"]
+    temps = weather_df.set_index("time")
+    days = [date(2026, 3, 1) + timedelta(days=i) for i in range(10)]
+    frame = training_frame(load, temps, days, time(10, 30), [24, 48, 168])
+
+    for day, rows in frame.groupby("target_day"):
+        issue = scheduled_issue_time(day, time(10, 30))
+        known = load[load.index + pd.Timedelta(hours=1) <= issue]
+        assert (rows["last_known_load"] == known.iloc[-1]).all()
+        for lag in (24, 48, 168):
+            src = rows.index - pd.Timedelta(hours=lag)
+            leaked = (src + pd.Timedelta(hours=1) > issue) & rows[f"load_lag_{lag}h"].notna()
+            assert not leaked.any(), f"lag {lag}h leaks data after issue on {day}"

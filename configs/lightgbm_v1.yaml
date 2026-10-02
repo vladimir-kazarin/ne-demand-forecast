@@ -3,9 +3,14 @@ seed: 42
 window:
   lookback_days: 730
   holdout_days: 28
-lag_hours: [24, 168]
+lag_hours: [24, 48, 168]
+issue_time_local: "10:30"
 lightgbm:
   objective: regression_l1
   n_estimators: 500
   learning_rate: 0.05
   num_leaves: 31
+  min_child_samples: 20
+  subsample: 0.8
+  subsample_freq: 1
+  colsample_bytree: 0.9

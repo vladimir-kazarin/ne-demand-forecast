@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import time
 from pathlib import Path
 
 import yaml
@@ -38,8 +39,10 @@ class TrainConfig(BaseModel):
     name: str
     seed: int = 42
     window: TrainingWindow = TrainingWindow()
-    lag_hours: list[int] = [24, 168]
-    lightgbm: dict[str, float | int | str] = {}
+    lag_hours: list[int] = [24, 48, 168]
+    # Local time on the day before the target day when the forecast is issued (ADR 0004).
+    issue_time_local: time = time(10, 30)
+    lightgbm: dict[str, float | int | str | bool] = {}
 
 
 def load_train_config(path: str | Path) -> TrainConfig:

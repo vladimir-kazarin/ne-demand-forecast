@@ -5,7 +5,7 @@ unattended, with every model decision visible on a public dashboard. The operati
 the product; the forecast is its workload. Forecasts are benchmarked against ISO New England's
 own load forecast and a naive same-hour-last-week baseline.
 
-> Status: **Phase 0 done; Phase 1 next.** Live dashboard link and architecture diagram land in phase 2.
+> Status: **Phase 1 done; Phase 2 next.** First model: 6.5% holdout MAPE vs 12.1% naive. Live dashboard link and architecture diagram land in phase 2.
 
 ## Pipeline
 
@@ -22,6 +22,7 @@ Weather fcst ─┘                                                             
 | Path | Stage |
 | --- | --- |
 | `src/ne_demand/ingestion/` | Hourly pulls of load, ISO forecast, weather; raw-zone storage |
+| `src/ne_demand/processing.py` | Raw partitions to hourly processed tables |
 | `src/ne_demand/validation/` | Pandera schemas, run before training and forecasting |
 | `src/ne_demand/features/` | Calendar and lag features, one code path for training and serving |
 | `src/ne_demand/training/` | Config-driven LightGBM training, MLflow tracking |
@@ -46,8 +47,13 @@ uv run ne-demand check-config
 make test
 
 # backfill raw history (resumable) and snapshot today's forecasts
-uv run ne-demand backfill --start 2024-10-01 --end 2026-10-01
+uv run ne-demand backfill --start 2024-09-20 --end 2026-10-01
 uv run ne-demand archive
+
+# build processed tables, train, and forecast tomorrow
+uv run ne-demand process --start 2024-09-20 --end 2026-10-02
+uv run ne-demand train
+uv run ne-demand forecast
 ```
 
 ### Infrastructure
@@ -78,13 +84,13 @@ when its **done-when** check passes.
 - [x] **Done when:** historical load and weather are in storage
 
 ### Phase 1 — Batch forecast with validation
-- [ ] Hourly ingestion job: idempotent, retries, alerts on failure
-- [ ] Pandera validation: schema, missing hours, duplicates, value ranges
-- [ ] Features: lagged load (24 h, 168 h), forecast temperature, calendar
-- [ ] LightGBM training from config
-- [ ] Daily batch forecast of 24 hourly values, stored with model version
-- [ ] Naive baseline (same hour last week) scored alongside
-- [ ] **Done when:** a broken column fails the pipeline with a clear error
+- [x] Hourly ingestion job: idempotent, retries, alerts on failure
+- [x] Pandera validation: schema, missing hours, duplicates, value ranges
+- [x] Features: lagged load (24 h, 48 h, 168 h), forecast temperature, calendar ([ADR 0004](docs/adr/0004-issue-time-and-features.md))
+- [x] LightGBM training from config
+- [x] Daily batch forecast of 24 hourly values, stored with model version
+- [x] Naive baseline (same hour last week) scored alongside
+- [x] **Done when:** a broken column fails the pipeline with a clear error
 
 ### Phase 2 — Tracking, registry, first dashboard (**v1 live**)
 - [ ] MLflow logging of params, metrics, data window, git commit
