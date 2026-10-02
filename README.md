@@ -5,7 +5,7 @@ unattended, with every model decision visible on a public dashboard. The operati
 the product; the forecast is its workload. Forecasts are benchmarked against ISO New England's
 own load forecast and a naive same-hour-last-week baseline.
 
-> Status: **Phase 0 — setup.** Live dashboard link and architecture diagram land in phase 2.
+> Status: **Phase 0 done; Phase 1 next.** Live dashboard link and architecture diagram land in phase 2.
 
 ## Pipeline
 
@@ -71,11 +71,11 @@ when its **done-when** check passes.
 ### Phase 0 — Setup
 - [x] Repository, project scaffold, CI
 - [x] Confirm the weather API offers archived forecasts for the backfill period ([ADR 0002](docs/adr/0002-data-sources-and-forecast-vintages.md))
-- [ ] AWS storage and GitHub OIDC role provisioned with Terraform ([ADR 0003](docs/adr/0003-terraform-for-aws.md))
+- [x] AWS storage and GitHub OIDC role provisioned with Terraform ([ADR 0003](docs/adr/0003-terraform-for-aws.md))
 - [ ] Register an ISO Express account (not needed for v1: public files suffice)
-- [ ] Backfill two years of load, ISO forecast, and forecast weather into raw storage
-- [ ] Start archiving the ISO forecast and weather forecast as issued
-- [ ] **Done when:** historical load and weather are in storage
+- [x] Backfill two years of load, ISO forecast, and forecast weather into raw storage
+- [x] Start archiving the ISO forecast and weather forecast as issued
+- [x] **Done when:** historical load and weather are in storage
 
 ### Phase 1 — Batch forecast with validation
 - [ ] Hourly ingestion job: idempotent, retries, alerts on failure
