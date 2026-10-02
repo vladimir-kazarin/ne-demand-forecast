@@ -1,0 +1,11 @@
+name: lightgbm_v1
+seed: 42
+window:
+  lookback_days: 730
+  holdout_days: 28
+lag_hours: [24, 168]
+lightgbm:
+  objective: regression_l1
+  n_estimators: 500
+  learning_rate: 0.05
+  num_leaves: 31

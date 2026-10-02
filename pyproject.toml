@@ -1,0 +1,56 @@
+[project]
+name = "ne-demand"
+version = "0.1.0"
+description = "Live pipeline forecasting next-day hourly electricity demand for New England"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+authors = [{ name = "Vladimir Kazarin" }]
+dependencies = [
+    "gridstatus",
+    "holidays",
+    "httpx",
+    "lightgbm",
+    "mlflow",
+    "pandas",
+    "pandera",
+    "pyarrow",
+    "pydantic-settings",
+    "pyyaml",
+    "s3fs",
+    "typer",
+]
+
+[project.optional-dependencies]
+serving = ["fastapi", "uvicorn[standard]"]
+monitoring = ["evidently"]
+dashboard = ["streamlit", "plotly"]
+
+[project.scripts]
+ne-demand = "ne_demand.cli:app"
+
+[dependency-groups]
+dev = ["pytest", "pytest-cov", "ruff", "mypy", "pandas-stubs", "types-pyyaml"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ne_demand"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "PD", "DTZ"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = ["smoke: fast end-to-end training smoke test run in CI"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+ignore_missing_imports = true

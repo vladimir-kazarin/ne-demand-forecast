@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# local data and artifacts — production storage is S3
+data/*
+!data/.gitkeep
+mlruns/
+mlartifacts/
+models/
