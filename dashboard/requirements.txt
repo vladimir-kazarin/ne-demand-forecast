@@ -1,0 +1,7 @@
+# Streamlit Community Cloud installs from this file. Kept separate from the
+# pipeline's dependencies so the app stays small and starts fast.
+streamlit==1.64.0
+pandas==2.3.3
+pyarrow==25.0.1
+s3fs==2026.9.0
+plotly==6.9.0
