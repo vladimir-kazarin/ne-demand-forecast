@@ -128,7 +128,7 @@ def train_cmd(
     from ne_demand.training.train import train
 
     meta = train(load_train_config(config), Settings().ne_data_root)
-    typer.echo(f"version: {meta['version']}")
+    typer.echo(f"model: {meta['version']}  registry: v{meta['registry_version']}")
     for k, v in meta["metrics"].items():
         typer.echo(f"  {k}: {v:.2f}%")
 
@@ -161,3 +161,15 @@ def forecast_cmd(
             return
     out = run_forecast(root, date.fromisoformat(day) if day else None, now)
     typer.echo(out[["time", "forecast_mw", "naive_mw"]].to_string(index=False))
+
+
+@app.command()
+def promote(
+    version: Annotated[str, typer.Argument(help="Registry version to put in production")],
+    reason: Annotated[str, typer.Option(help="Why; recorded on the model version")],
+) -> None:
+    """Point the production alias at a registry version (Phase 4 automates this via the gate)."""
+    from ne_demand.training.tracking import promote as do_promote
+
+    do_promote(version, reason)
+    typer.echo(f"production -> v{version}")

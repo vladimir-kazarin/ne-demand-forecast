@@ -26,3 +26,6 @@ models/
 !*.tfvars.example
 crash.log
 tfplan
+
+# local MLflow store
+mlflow.db

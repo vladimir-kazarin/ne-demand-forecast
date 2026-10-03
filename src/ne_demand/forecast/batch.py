@@ -20,7 +20,7 @@ from ne_demand.forecast.baseline import same_hour_last_week
 from ne_demand.ingestion import weather
 from ne_demand.ingestion.storage import write_raw
 from ne_demand.processing import read_processed, weather_hourly
-from ne_demand.training.model_store import load_model
+from ne_demand.training.tracking import REGISTERED_MODEL, load_production
 from ne_demand.validation.schemas import DataValidationError, validate_load, validate_weather
 
 log = logging.getLogger(__name__)
@@ -32,6 +32,24 @@ REQUIRED_FEATURES = ["hour", "weekday", "lead_hours", "last_known_load", "temp_m
 def forecast_path(root: str, day: date, issued_at: datetime) -> str:
     stamp = issued_at.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
     return f"{root.rstrip('/')}/forecasts/date={day.isoformat()}/issued_at={stamp}.parquet"
+
+
+PUBLISHED = "published/forecasts.parquet"
+
+
+def publish(root: str, out: pd.DataFrame) -> None:
+    """Append to the single table the dashboard reads (one request, fast page loads)."""
+    fs, path = fsspec.core.url_to_fs(f"{root.rstrip('/')}/{PUBLISHED}")
+    existing = pd.DataFrame()
+    if fs.exists(path):
+        with fs.open(path, "rb") as f:
+            existing = pd.read_parquet(f)
+    merged = pd.concat([existing, out], ignore_index=True).drop_duplicates(
+        ["time", "issued_at"], keep="last"
+    )
+    fs.makedirs(path.rsplit("/", 1)[0], exist_ok=True)
+    with fs.open(path, "wb") as f:
+        merged.to_parquet(f, index=False)
 
 
 def forecast_exists(root: str, day: date) -> bool:
@@ -60,7 +78,7 @@ def run_forecast(
     if issue >= idx[0]:
         log.warning("forecast for %s issued after the day started (%s)", target_day, issue)
 
-    booster, meta = load_model(root)
+    booster, meta = load_production()
     lags = meta["config"]["lag_hours"]
 
     load_df = read_processed(root, "load_hourly")
@@ -86,7 +104,9 @@ def run_forecast(
             "time": idx,
             "forecast_mw": booster.predict(feats[meta["features"]]),
             "naive_mw": same_hour_last_week(load, idx).to_numpy(),
-            "model_version": meta["version"],
+            "model_version": f"{REGISTERED_MODEL}/v{meta['registry_version']}",
+            "model_id": meta["version"],
+            "git_commit": meta["git_commit"],
             "issued_at": issue,
             "target_day": target_day,
         }
@@ -96,6 +116,7 @@ def run_forecast(
     fs.makedirs(fs_path.rsplit("/", 1)[0], exist_ok=True)
     with fs.open(fs_path, "wb") as f:
         out.to_parquet(f, index=False)
+    publish(root, out)
     log.info(
         "published %d-hour forecast for %s with %s -> %s",
         len(out),

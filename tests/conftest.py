@@ -37,3 +37,16 @@ def small_config() -> TrainConfig:
         window=TrainingWindow(lookback_days=40, holdout_days=7),
         lightgbm={"n_estimators": 50, "num_leaves": 15, "objective": "regression_l1"},
     )
+
+
+@pytest.fixture(autouse=True)
+def local_mlflow(tmp_path, monkeypatch):
+    """Every test gets its own throwaway MLflow tracking store and registry."""
+    import mlflow
+
+    uri = f"sqlite:///{tmp_path}/mlflow.db"
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", uri)
+    monkeypatch.setenv("MLFLOW_DISABLE_AGENT_HINT", "1")
+    mlflow.set_tracking_uri(uri)
+    yield uri
+    mlflow.set_tracking_uri(None)

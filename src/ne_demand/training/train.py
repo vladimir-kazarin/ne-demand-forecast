@@ -15,7 +15,7 @@ from ne_demand.evaluation.metrics import mape
 from ne_demand.features.build import TEMP_COLUMNS, target_hours, training_frame
 from ne_demand.forecast.baseline import same_hour_last_week
 from ne_demand.processing import read_processed
-from ne_demand.training.model_store import save_model
+from ne_demand.training import tracking
 from ne_demand.validation.schemas import validate_load, validate_weather
 
 log = logging.getLogger(__name__)
@@ -105,6 +105,7 @@ def train(cfg: TrainConfig, root: str, end_day: date | None = None) -> dict:
         "git_commit": commit,
         "config": cfg.model_dump(mode="json"),
         "features": features,
+        "data_hash": tracking.data_hash(frame),
         "data_window": {
             "train_start": str(days[0]),
             "train_end": str(min(holdout_days) - timedelta(days=1)),
@@ -115,6 +116,8 @@ def train(cfg: TrainConfig, root: str, end_day: date | None = None) -> dict:
         },
         "metrics": metrics,
     }
-    save_model(root, model.booster_, metadata)
+    metadata["registry_version"] = tracking.log_and_register(model.booster_, metadata)
+    if tracking.production_version() is None:
+        tracking.promote(metadata["registry_version"], "first model: no production version yet")
     log.info("trained %s: %s", metadata["version"], metrics)
     return metadata

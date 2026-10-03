@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from ne_demand.forecast.batch import run_forecast
-from ne_demand.training.model_store import load_model
+from ne_demand.training.tracking import load_production
 from ne_demand.training.train import train
 from ne_demand.validation.schemas import DataValidationError
 
@@ -36,7 +36,7 @@ def trained_root(tmp_path, tables, small_config):
 
 
 def test_training_beats_naive_and_records_lineage(trained_root):
-    _, meta = load_model(str(trained_root))
+    _, meta = load_production()
     m = meta["metrics"]
     assert m["holdout_mape"] < m["naive_holdout_mape"]
     assert meta["git_commit"]
@@ -44,7 +44,7 @@ def test_training_beats_naive_and_records_lineage(trained_root):
 
 
 def test_retraining_same_config_reproduces_metrics(trained_root, small_config):
-    _, first = load_model(str(trained_root))
+    _, first = load_production()
     second = train(small_config, str(trained_root), end_day=date(2026, 3, 18))
     assert second["metrics"]["holdout_mape"] == pytest.approx(first["metrics"]["holdout_mape"])
 
@@ -54,8 +54,10 @@ def test_forecast_published_for_next_day(trained_root, tables):
     out = run_forecast(str(trained_root), TARGET, ISSUE, temps=weather)
     assert len(out) == 24
     assert out["forecast_mw"].between(5_000, 25_000).all()
-    assert (out["model_version"] == out["model_version"].iloc[0]).all()
+    assert (out["model_version"] == "ne-demand-lightgbm/v1").all()
     assert len(_forecasts(trained_root)) == 1
+    published = pd.read_parquet(trained_root / "published" / "forecasts.parquet")
+    assert len(published) == 24
 
 
 def test_broken_column_fails_and_publishes_nothing(trained_root, tables):
