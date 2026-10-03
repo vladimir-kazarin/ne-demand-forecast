@@ -228,9 +228,14 @@ c1.metric(
     f"{f['forecast_mw'].max():,.0f} MW",
     help=f"at {local_wall_time([peak_time])[0]:%-I %p} ET",
 )
+# "ne-demand-lightgbm/v1" shows as "v1"; forecasts issued before the registry existed
+# ("pre-registry/<model id>") show as "pre-registry", with the id in the tooltip.
 name, _, ver = f["model_version"].iloc[0].rpartition("/")
+shown = name if name == "pre-registry" else ver
 c2.metric(
-    "Model version", ver or name, help=f"{name or 'model'}, commit {f['git_commit'].iloc[0][:7]}"
+    "Model version",
+    shown,
+    help=f"{f['model_version'].iloc[0]}, commit {f['git_commit'].iloc[0][:7]}",
 )
 c3.metric("Issued", f"{issued_at.tz_convert(LOCAL_TZ):%b %-d, %-I:%M %p} ET")
 
