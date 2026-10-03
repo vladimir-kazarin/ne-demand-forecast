@@ -29,3 +29,6 @@ tfplan
 
 # local MLflow store
 mlflow.db
+
+# Streamlit secrets (dashboard S3 key)
+.streamlit/secrets.toml
