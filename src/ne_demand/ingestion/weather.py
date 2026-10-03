@@ -59,7 +59,9 @@ def fetch_previous_runs(start: date, end: date) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
-def fetch_forecast(forecast_days: int = 3) -> pd.DataFrame:
+def fetch_forecast(forecast_days: int = 4) -> pd.DataFrame:
+    # Days are UTC. A local (ET) target day ends 4-5 hours into the next UTC day, so a
+    # forecast issued late, or for two days out, needs the 4th UTC day to cover its evening.
     frames = []
     for station, (lat, lon) in WEATHER_STATIONS.items():
         payload = _get(
