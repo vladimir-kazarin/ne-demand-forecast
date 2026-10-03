@@ -5,7 +5,10 @@ unattended, with every model decision visible on a public dashboard. The operati
 the product; the forecast is its workload. Forecasts are benchmarked against ISO New England's
 own load forecast and a naive same-hour-last-week baseline.
 
-> Status: **Phase 1 done; Phase 2 next.** First model: 6.5% holdout MAPE vs 12.1% naive. Live dashboard link and architecture diagram land in phase 2.
+> Status: **Phase 2 in progress** — tracking and registry live, app deploy pending.
+> Production model `ne-demand-lightgbm` v1: 6.5% holdout MAPE vs 12.3% naive.
+>
+> **[Experiments and model registry (MLflow on DagsHub)](https://dagshub.com/vladimir-kazarin/ne-demand-forecast.mlflow)**
 
 ## Pipeline
 
@@ -93,10 +96,10 @@ when its **done-when** check passes.
 - [x] **Done when:** a broken column fails the pipeline with a clear error
 
 ### Phase 2 — Tracking, registry, first dashboard (**v1 live**)
-- [ ] MLflow logging of params, metrics, data window, git commit
-- [ ] Model registry with `candidate` and `production` aliases
+- [x] MLflow logging of params, metrics, data window, data hash, git commit ([ADR 0005](docs/adr/0005-mlflow-on-dagshub-and-streamlit-cloud.md))
+- [x] Model registry with `candidate` and `production` aliases; lineage tags on every version
 - [ ] Deployed prediction app with the forecast page
-- [ ] **Done when:** the production version traces to its data and commit
+- [x] **Done when:** the production version traces to its data and commit
 
 ### Phase 3 — Serving API
 - [ ] FastAPI service with `/health` and `/predict`
