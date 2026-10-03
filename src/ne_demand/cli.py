@@ -9,6 +9,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 
 import typer
+from dotenv import load_dotenv
 
 from ne_demand import __version__
 from ne_demand.config import LOCAL_TZ, Settings, load_train_config
@@ -19,6 +20,9 @@ app = typer.Typer(no_args_is_help=True, help="New England demand forecasting pip
 
 @app.callback()
 def main(verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False) -> None:
+    # MLflow reads MLFLOW_TRACKING_* from the process environment, not from Settings, so
+    # export .env locally. Real environment variables (e.g. in GitHub Actions) win.
+    load_dotenv(override=False)
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
