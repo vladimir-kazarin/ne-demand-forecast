@@ -1,0 +1,15 @@
+# Deliberately degraded model for the gate demo (PRD: "a deliberately degraded
+# model is rejected automatically"). Two shallow trees at a tiny learning rate
+# barely move off the mean, so the gate must reject it.
+name: degraded_demo
+seed: 42
+window:
+  lookback_days: 730
+  holdout_days: 28
+lag_hours: [24, 48, 168]
+issue_time_local: "10:30"
+lightgbm:
+  objective: regression_l1
+  n_estimators: 2
+  learning_rate: 0.01
+  num_leaves: 4

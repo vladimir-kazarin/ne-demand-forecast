@@ -172,11 +172,17 @@ def promote(
     version: Annotated[str, typer.Argument(help="Registry version to put in production")],
     reason: Annotated[str, typer.Option(help="Why; recorded on the model version")],
 ) -> None:
-    """Point the production alias at a registry version (Phase 4 automates this via the gate)."""
+    """Manually point production at a registry version (normally the gate does this)."""
+    from ne_demand.evaluation.events import append_event
+    from ne_demand.training.tracking import production_version
     from ne_demand.training.tracking import promote as do_promote
 
-    do_promote(version, reason)
-    typer.echo(f"production -> v{version}")
+    previous = production_version()
+    do_promote(version, f"manual: {reason}")
+    append_event(
+        Settings().ne_data_root, "promoted", version, f"manual: {reason}", from_version=previous
+    )
+    typer.echo(f"production: v{previous} -> v{version}")
 
 
 @app.command(name="export-model")

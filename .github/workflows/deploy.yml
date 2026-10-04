@@ -21,6 +21,10 @@ on:
         description: "Train and gate a candidate first"
         type: boolean
         default: true
+      config:
+        description: "Training config for the candidate"
+        type: string
+        default: configs/lightgbm_v1.yaml
 
 permissions:
   id-token: write
@@ -55,7 +59,7 @@ jobs:
           aws-region: us-east-1
       - run: uv sync --locked --no-dev
       - name: Train candidate
-        run: uv run ne-demand train | tee -a "$GITHUB_STEP_SUMMARY"
+        run: uv run ne-demand train --config "${{ inputs.config || 'configs/lightgbm_v1.yaml' }}" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Gate candidate against production
         run: uv run ne-demand gate | tee -a "$GITHUB_STEP_SUMMARY"
 
