@@ -1,0 +1,11 @@
+# Direct runtime needs of ne_demand.serving. Versions are constrained to uv.lock at
+# build time, so the image runs exactly the versions the tests ran.
+fastapi
+uvicorn
+lightgbm
+pandas
+pyarrow
+holidays
+pydantic-settings
+pyyaml
+s3fs

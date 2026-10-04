@@ -32,3 +32,6 @@ mlflow.db
 
 # Streamlit secrets (dashboard S3 key)
 .streamlit/secrets.toml
+
+# serving image build context (exported model bundle)
+build/
