@@ -35,3 +35,4 @@ jobs:
         env:
           NE_DATA_ROOT: ${{ vars.NE_DATA_ROOT }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SNS_TOPIC_ARN: ${{ vars.SNS_TOPIC_ARN }}

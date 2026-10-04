@@ -35,3 +35,6 @@ mlflow.db
 
 # serving image build context (exported model bundle)
 build/
+
+# terraform build artifacts (zipped Lambda code)
+infra/aws/.build/
