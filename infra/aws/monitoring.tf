@@ -7,7 +7,7 @@
 variable "watchdog_schedule_enabled" {
   description = "Run the watchdog hourly (needs scheduler permissions on the deployer role)"
   type        = bool
-  default     = false
+  default     = true
 }
 
 resource "aws_sns_topic" "alerts" {
