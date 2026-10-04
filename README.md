@@ -5,11 +5,12 @@ unattended, with every model decision visible on a public dashboard. The operati
 the product; the forecast is its workload. Forecasts are benchmarked against ISO New England's
 own load forecast and a naive same-hour-last-week baseline.
 
-> Status: **Phase 2 done — v1 is live.**
+> Status: **Phase 3 done — the model is served by a public API.**
 > Production model `ne-demand-lightgbm` v1: 6.5% holdout MAPE vs 12.3% naive.
 >
 > **[Live forecast app](https://ne-demand-forecast-njvzyctwntwcxquaahetkb.streamlit.app/)** ·
-> **[Experiments and model registry (MLflow on DagsHub)](https://dagshub.com/vladimir-kazarin/ne-demand-forecast.mlflow)**
+> **[Experiments and model registry (MLflow on DagsHub)](https://dagshub.com/vladimir-kazarin/ne-demand-forecast.mlflow)** ·
+> **[Prediction API](https://ycw52embas2yt2mdbaucbkyt4e0upcey.lambda-url.us-east-1.on.aws/health)** (`POST /predict`)
 
 ## Pipeline
 
@@ -32,11 +33,11 @@ Weather fcst ─┘                                                             
 | `src/ne_demand/training/` | Config-driven LightGBM training, MLflow tracking |
 | `src/ne_demand/evaluation/` | MAPE and the promotion gate |
 | `src/ne_demand/forecast/` | Daily batch forecast and the naive baseline |
-| `src/ne_demand/serving/` | FastAPI service |
+| `src/ne_demand/serving/` | FastAPI service and model bundle |
 | `src/ne_demand/monitoring/` | Error, drift, freshness, alerts |
 | `dashboard/` | Streamlit prediction app and ops dashboard |
 | `configs/` | Training configs |
-| `infra/` | Terraform for AWS (state bucket, data bucket, GitHub OIDC role, budget) |
+| `infra/` | Terraform for AWS (state, data bucket, GitHub OIDC role, budget, ECR, Lambda API, dashboard reader) |
 | `docs/adr/` | Decision records |
 | `docs/incidents.md` | Incident log |
 
@@ -58,6 +59,14 @@ uv run ne-demand archive
 uv run ne-demand process --start 2024-09-20 --end 2026-10-02
 uv run ne-demand train
 uv run ne-demand forecast
+```
+
+### Serving image
+
+```bash
+make image          # export the production model, build the image
+make serve          # run it on localhost:8090 with ./data
+make load-test      # p95 budget 200 ms
 ```
 
 ### Infrastructure
@@ -104,11 +113,11 @@ when its **done-when** check passes.
 - [x] **Done when:** the production version traces to its data and commit
 
 ### Phase 3 — Serving API
-- [ ] FastAPI service with `/health` and `/predict`
-- [ ] Docker image, public scale-to-zero deployment
-- [ ] Predict form in the app
-- [ ] Load test: local p95 under 200 ms
-- [ ] **Done when:** a bad model path fails at startup
+- [x] FastAPI service with `/health` and `/predict` ([ADR 0006](docs/adr/0006-serving-on-lambda.md))
+- [x] Docker image, public scale-to-zero deployment (AWS Lambda + Function URL, model baked into the image)
+- [x] Predict form in the app
+- [x] Load test: local p95 under 200 ms (105 ms local; 72 ms over the internet)
+- [x] **Done when:** a bad model path fails at startup
 
 ### Phase 4 — CI/CD, gate, rollback
 - [ ] PR workflow: lint, unit tests, training smoke test
