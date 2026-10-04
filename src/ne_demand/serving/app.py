@@ -64,10 +64,15 @@ class LoadHistory:
         self.root = root
         # Typed empty history (UTC hourly index), so "no data" flows through the feature code.
         self._series = pd.Series(dtype=float, index=pd.DatetimeIndex([], tz="UTC"))
-        self._loaded_at = 0.0
+        # None = never loaded. Not 0.0: monotonic() counts from boot, and a fresh Lambda
+        # micro-VM is seconds old, so "0.0 + TTL" would skip the first load entirely.
+        self._loaded_at: float | None = None
+
+    def _stale(self) -> bool:
+        return self._loaded_at is None or time.monotonic() - self._loaded_at > HISTORY_TTL_SECONDS
 
     def get(self) -> pd.Series:
-        if self.root and time.monotonic() - self._loaded_at > HISTORY_TTL_SECONDS:
+        if self.root and self._stale():
             try:
                 df = read_processed(self.root, "load_hourly")
                 self._series = df.set_index("time")["load_mw"] if not df.empty else self._series

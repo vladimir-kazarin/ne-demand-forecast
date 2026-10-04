@@ -111,3 +111,17 @@ def test_missing_history_still_predicts_without_lags(served):
         ).json()
     assert not any(body["lags_available"].values())
     assert body["forecast_mw"] > 0
+
+
+def test_history_loads_on_a_freshly_booted_host(served, monkeypatch):
+    """Lambda micro-VMs have a small monotonic clock; the first request must still load."""
+    import ne_demand.serving.app as serving_app
+
+    _, root, model_dir = served
+    monkeypatch.setattr(serving_app.time, "monotonic", lambda: 3.0)  # 3 s since boot
+    app = create_app(str(model_dir), str(root), clock=lambda: pd.Timestamp(ISSUE))
+    with TestClient(app) as client:
+        body = client.post(
+            "/predict", json={"date": str(TARGET), "hour": 8, "temperature_c": 5}
+        ).json()
+    assert body["lags_available"]["load_lag_168h"] is True
