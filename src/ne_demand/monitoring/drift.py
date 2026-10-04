@@ -10,11 +10,18 @@ Two alerting checks target the drift that actually breaks this model:
   have a temperature beyond the training range ± 2 °C.
 
 PSI (Population Stability Index) per feature against the same weeks one year
-earlier is reported as context but does not alert. Backtest over 49 weeks
-(Oct 2025 - Oct 2026): raw-temperature PSI exceeded the classic 0.25 cut-off in
-every week, because one week of hourly weather is effectively seven samples and
-this year's weather is simply different from last year's. Forecast error, tracked
-daily, is the primary alarm; these checks explain it and catch data faults early.
+earlier is reported as context but does not alert.
+
+Backtest over 49 real weeks (Oct 2025 - Oct 2026):
+- Raw-temperature PSI exceeded the classic 0.25 cut-off in all 49 weeks: one week
+  of hourly weather is effectively seven samples, and this year's weather simply
+  differs from last year's. Alerting on it would be noise.
+- These two checks alerted in 2 weeks (4%), both in the late Jan / early Feb 2026
+  Arctic outbreak, when temperatures left the training range: real signal.
+- An injected +3 °C error on one station fires (2.6 °C shift); +8 °C fires clearly.
+
+Forecast error, tracked daily, is the primary alarm; these checks explain it and
+catch data faults early.
 """
 
 from __future__ import annotations
