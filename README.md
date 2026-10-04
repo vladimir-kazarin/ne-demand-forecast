@@ -5,7 +5,7 @@ unattended, with every model decision visible on a public dashboard. The operati
 the product; the forecast is its workload. Forecasts are benchmarked against ISO New England's
 own load forecast and a naive same-hour-last-week baseline.
 
-> Status: **Phase 3 done — the model is served by a public API.**
+> Status: **Phase 4 done — models reach production only through the gate; rollback in about a minute.**
 > Production model `ne-demand-lightgbm` v1: 6.5% holdout MAPE vs 12.3% naive.
 >
 > **[Live forecast app](https://ne-demand-forecast-njvzyctwntwcxquaahetkb.streamlit.app/)** ·
@@ -120,11 +120,11 @@ when its **done-when** check passes.
 - [x] **Done when:** a bad model path fails at startup
 
 ### Phase 4 — CI/CD, gate, rollback
-- [ ] PR workflow: lint, unit tests, training smoke test
-- [ ] Merge workflow: build image, register candidate
-- [ ] Evaluation gate on a fixed holdout (MAPE, set improvement margin)
-- [ ] One-command rollback workflow, logged
-- [ ] **Done when:** a degraded model is rejected, and rollback takes under 5 minutes
+- [x] PR workflow: lint, unit tests, training smoke test, Terraform validate
+- [x] Merge workflow: train and register a candidate, gate it, build and deploy the image ([ADR 0007](docs/adr/0007-cicd-gate-and-rollback.md))
+- [x] Evaluation gate on a fixed holdout (MAPE, 2% improvement margin, must beat naive)
+- [x] One-click rollback workflow, logged in the registry and the model event log
+- [x] **Done when:** a degraded model is rejected ([run](https://github.com/vladimir-kazarin/ne-demand-forecast/actions/runs/37167605349)), and rollback takes under 5 minutes (53 s, [run](https://github.com/vladimir-kazarin/ne-demand-forecast/actions/runs/37167844527))
 
 ### Phase 5 — Scheduled retraining
 - [ ] Weekly retrain on a rolling window, sent through the gate
