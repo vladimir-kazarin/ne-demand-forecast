@@ -87,16 +87,36 @@ def promote(version: str, reason: str) -> None:
     log.info("production: v%s -> v%s (%s)", previous, version, reason)
 
 
-def load_production() -> tuple[lgb.Booster, dict]:
-    """The production booster and its training metadata (features, lags, lineage)."""
-    client = MlflowClient()
+def alias_version(alias: str) -> str | None:
     try:
-        mv = client.get_model_version_by_alias(REGISTERED_MODEL, PRODUCTION)
+        return str(MlflowClient().get_model_version_by_alias(REGISTERED_MODEL, alias).version)
     except MlflowException:
-        raise LookupError(
-            f"no '{PRODUCTION}' alias on {REGISTERED_MODEL}; train and promote a model first"
-        ) from None
-    booster = mlflow.lightgbm.load_model(f"models:/{REGISTERED_MODEL}@{PRODUCTION}")
+        return None
+
+
+def version_tags(version: str) -> dict[str, str]:
+    return dict(MlflowClient().get_model_version(REGISTERED_MODEL, version).tags)
+
+
+def set_version_tags(version: str, tags: dict) -> None:
+    client = MlflowClient()
+    for k, v in tags.items():
+        client.set_model_version_tag(REGISTERED_MODEL, version, k, str(v))
+
+
+def load_version(version: str) -> tuple[lgb.Booster, dict]:
+    """A registry version's booster and its training metadata (features, lags, lineage)."""
+    mv = MlflowClient().get_model_version(REGISTERED_MODEL, version)
+    booster = mlflow.lightgbm.load_model(f"models:/{REGISTERED_MODEL}/{version}")
     metadata = mlflow.artifacts.load_dict(f"runs:/{mv.run_id}/metadata.json")
     metadata["registry_version"] = str(mv.version)
     return booster, metadata
+
+
+def load_production() -> tuple[lgb.Booster, dict]:
+    version = production_version()
+    if version is None:
+        raise LookupError(
+            f"no '{PRODUCTION}' alias on {REGISTERED_MODEL}; train and promote a model first"
+        )
+    return load_version(version)

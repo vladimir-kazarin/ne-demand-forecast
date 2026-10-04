@@ -194,3 +194,30 @@ def export_model(
     typer.echo(
         f"exported ne-demand-lightgbm/v{meta['registry_version']} ({meta['version']}) -> {path}"
     )
+
+
+@app.command()
+@alerting
+def gate(
+    version: Annotated[
+        str | None, typer.Option(help="Candidate version (default: candidate alias)")
+    ] = None,
+    margin: Annotated[float, typer.Option(help="Required relative MAPE improvement")] = 0.02,
+) -> None:
+    """Score the candidate against production on an unseen holdout; promote or reject."""
+    from ne_demand.evaluation.gate import run_gate
+
+    r = run_gate(Settings().ne_data_root, version, margin)
+    typer.echo(f"{r.decision}: v{r.candidate_version} - {r.reason}")
+
+
+@app.command()
+@alerting
+def rollback(
+    reason: Annotated[str, typer.Option(help="Why; recorded on the model version and event log")],
+) -> None:
+    """Return production to the version it replaced."""
+    from ne_demand.evaluation.gate import rollback as do_rollback
+
+    old, new = do_rollback(Settings().ne_data_root, reason)
+    typer.echo(f"production: v{old} -> v{new}")

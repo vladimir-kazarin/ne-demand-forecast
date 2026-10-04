@@ -11,6 +11,7 @@ import lightgbm as lgb
 import pandas as pd
 
 from ne_demand.config import LOCAL_TZ, TrainConfig
+from ne_demand.evaluation.events import append_event
 from ne_demand.evaluation.metrics import mape
 from ne_demand.features.build import TEMP_COLUMNS, target_hours, training_frame
 from ne_demand.forecast.baseline import same_hour_last_week
@@ -116,8 +117,20 @@ def train(cfg: TrainConfig, root: str, end_day: date | None = None) -> dict:
         },
         "metrics": metrics,
     }
-    metadata["registry_version"] = tracking.log_and_register(model.booster_, metadata)
+    metadata["registry_version"] = version = tracking.log_and_register(model.booster_, metadata)
+    append_event(
+        root,
+        "registered",
+        version,
+        f"trained with {cfg.name}",
+        candidate_mape=metrics["holdout_mape"],
+        naive_mape=metrics["naive_holdout_mape"],
+        holdout_start=metadata["data_window"]["holdout_start"],
+        holdout_end=metadata["data_window"]["holdout_end"],
+    )
     if tracking.production_version() is None:
-        tracking.promote(metadata["registry_version"], "first model: no production version yet")
+        reason = "first model: no production version yet"
+        tracking.promote(version, reason)
+        append_event(root, "promoted", version, reason)
     log.info("trained %s: %s", metadata["version"], metrics)
     return metadata
