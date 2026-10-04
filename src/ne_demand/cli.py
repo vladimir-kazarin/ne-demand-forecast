@@ -238,3 +238,25 @@ def production_version_cmd() -> None:
     if v is None:
         raise typer.Exit(1)
     typer.echo(v)
+
+
+@app.command()
+@alerting
+def monitor(
+    inject_shift: Annotated[
+        list[str] | None,
+        typer.Option(help="Drill: add a shift to a feature, e.g. temp_boston=8 (repeatable)"),
+    ] = None,
+) -> None:
+    """Run one monitoring cycle: freshness, forecast error, input drift, alerts."""
+    from ne_demand.monitoring.monitor import run_monitor
+
+    inject = None
+    if inject_shift:
+        inject = {k: float(v) for k, v in (s.split("=", 1) for s in inject_shift)}
+    status = run_monitor(Settings().ne_data_root, inject=inject)
+    for check, result in status["checks"].items():
+        typer.echo(f"{check:20s} {result}")
+    if status["drift_note"]:
+        typer.echo(f"{'drift':20s} {status['drift_note']}")
+    typer.echo(f"alerts sent: {status['alerts_sent'] or 'none'}")

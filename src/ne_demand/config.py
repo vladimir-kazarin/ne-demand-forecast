@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     ne_data_root: str = "data"
     mlflow_tracking_uri: str | None = None
     slack_webhook_url: SecretStr | None = None
+    sns_topic_arn: str | None = None
 
 
 class TrainingWindow(BaseModel):
