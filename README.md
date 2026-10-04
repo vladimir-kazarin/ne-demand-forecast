@@ -5,7 +5,7 @@ unattended, with every model decision visible on a public dashboard. The operati
 the product; the forecast is its workload. Forecasts are benchmarked against ISO New England's
 own load forecast and a naive same-hour-last-week baseline.
 
-> Status: **Phase 6 in progress — monitoring live (error, drift, freshness, watchdog, email alerts).**
+> Status: **Phase 6 done — monitoring live; on its first day it caught a forecast job that never started.**
 >
 > **[Live forecast app](https://ne-demand-forecast-njvzyctwntwcxquaahetkb.streamlit.app/)** ·
 > **[Experiments and model registry (MLflow on DagsHub)](https://dagshub.com/vladimir-kazarin/ne-demand-forecast.mlflow)** ·
@@ -208,13 +208,13 @@ flowchart LR
 | Weekly retrain = the Deploy workflow on a schedule | Reuses the gate, record and deploy path that already work | Weekly cadence can lag a sudden demand shift |
 | Move scheduling from GitHub cron to AWS EventBridge Scheduler | Fires on time; GitHub dropped most runs on day one | One more AWS component, plus a token to trigger workflows |
 
-### Phase 6 — Monitoring and alerts
+### Phase 6 — Monitoring and alerts ✅
 - [x] Forecast error tracking (model, ISO day-ahead, ISO same-day, naive), daily, rolling 7/30-day
 - [x] Input drift: station consistency and out-of-range checks, calibrated on a year of real weeks; PSI/KS context and Evidently reports ([ADR 0008](docs/adr/0008-monitoring-and-drift.md))
 - [x] Data freshness and job checks, plus a watchdog Lambda in AWS that catches jobs that never start
 - [x] Email alerts through AWS SNS: once when firing, daily reminder, resolved message
 - [x] Operations page in the app: health, accuracy, model timeline, drift
-- [ ] **Done when:** an injected input shift fires an alert within one cycle (drill: `Monitor` workflow, `inject_shift=temp_boston=8`)
+- [x] **Done when:** an injected input shift fires an alert within one cycle (+8 °C on Boston detected as a 6.1 °C station shift and emailed in the same cycle, 34 s from dispatch: [run](https://github.com/vladimir-kazarin/ne-demand-forecast/actions/runs/37216322878))
 
 | Decision | Why | Tradeoff |
 | --- | --- | --- |
@@ -227,7 +227,7 @@ flowchart LR
 ### Phase 7 — Showcase
 - [x] Architecture diagram
 - [x] Decision records for main tool choices
-- [ ] Recorded failure demos: validation failure, rejected model ✅, rollback ✅, drift alert
+- [ ] Recorded failure demos: validation failure, rejected model ✅, rollback ✅, drift alert ✅
 - [ ] Quickstart and incident log
 - [ ] **Done when:** a stranger runs it locally within 60 minutes
 
