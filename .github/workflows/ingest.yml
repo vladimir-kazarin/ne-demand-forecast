@@ -4,9 +4,9 @@ name: Ingest
 # forecasts as issued. Historical ISO files keep only same-day vintages, so the
 # day-ahead benchmark exists only because this job archives it (ADR 0002).
 
+# Triggered hourly at :17 UTC by AWS EventBridge Scheduler via the dispatcher Lambda
+# (infra/aws/scheduling.tf, ADR 0009); GitHub's own cron skipped too many runs.
 on:
-  schedule:
-    - cron: "17 * * * *"
   workflow_dispatch:
 
 permissions:

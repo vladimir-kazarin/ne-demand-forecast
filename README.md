@@ -33,14 +33,18 @@ flowchart LR
         OM["Open-Meteo<br/>weather forecasts"]
     end
 
-    subgraph GH["GitHub Actions"]
-        ING["Ingest<br/>hourly"]
-        FC["Forecast<br/>daily, 10:30 ET"]
+    subgraph GH["GitHub Actions (runners)"]
+        ING["Ingest + Monitor<br/>hourly"]
+        FC["Forecast<br/>daily, 10:32 ET"]
         DEP["Deploy<br/>on merge: train, gate, build"]
         RB["Rollback<br/>one click"]
     end
 
     subgraph AWS["AWS (all Terraform)"]
+        SCHED["EventBridge Scheduler<br/>ingest :17, monitor :47, forecast 10:32 ET"]
+        DISP["Dispatcher Lambda<br/>workflow_dispatch"]
+        WD["Watchdog Lambda<br/>hourly freshness check"]
+        SNS["SNS<br/>email alerts"]
         S3[("S3 data bucket<br/>raw, processed, forecasts, published")]
         ECR[("ECR<br/>one image per model version")]
         API["Lambda + Function URL<br/>FastAPI /predict"]
@@ -50,6 +54,11 @@ flowchart LR
     APP["Streamlit Cloud<br/>public app"]
     USER(("Visitor"))
 
+    SCHED --> DISP
+    DISP -->|starts| ING
+    DISP -->|starts| FC
+    WD -.->|timestamps| S3
+    WD --> SNS
     ISO --> ING
     OM --> ING
     ING --> S3
@@ -68,6 +77,9 @@ flowchart LR
     USER --> API
 ```
 
+AWS EventBridge Scheduler decides *when* jobs run and a dispatcher Lambda starts them on
+GitHub Actions; GitHub's own cron skipped too many runs ([ADR 0009](docs/adr/0009-scheduling-on-eventbridge.md)).
+A watchdog Lambda checks freshness from inside AWS and emails alerts through SNS.
 GitHub Actions signs in to AWS with short-lived OIDC tokens (no stored keys), and only from
 `main`. Its role can read and write the data bucket but not delete, so raw data is append-only.
 
@@ -125,7 +137,7 @@ decisions and what they cost; the full reasoning is in the [decision records](do
 | ISO-NE public files via `gridstatus`, no login | Zero setup, two years backfilled in minutes | History keeps only ISO's same-day forecast, so the fair day-ahead benchmark must be archived live and builds up over time |
 | Train on Open-Meteo *forecast* weather (Previous Runs API), not observed | The model sees what it would have known when issuing | Training lead time is about 24 h; live forecasts are 14–38 h ahead |
 | Terraform from day one (the PRD deferred it) | Every AWS resource is reviewable and reproducible | A separate bootstrap stack for the state bucket |
-| GitHub Actions cron for scheduling | Free, lives in the repo | Dropped most hourly runs on day one ([incident log](docs/incidents.md)) |
+| GitHub Actions cron for scheduling (replaced in Phase 6, [ADR 0009](docs/adr/0009-scheduling-on-eventbridge.md)) | Free, lives in the repo | Dropped most hourly runs on day one and never started a forecast on day three ([incident log](docs/incidents.md)) |
 
 ### Phase 1 — Batch forecast with validation ✅
 - [x] Hourly ingestion job: idempotent, retries, alerts on failure
@@ -203,10 +215,10 @@ flowchart LR
 - [ ] Weekly retrain on a rolling window, sent through the gate
 - [ ] **Done when:** the log shows promoted and rejected weeks, each with a reason
 
-| Planned decision | Why | Tradeoff |
+| Decision | Why | Tradeoff |
 | --- | --- | --- |
-| Weekly retrain = the Deploy workflow on a schedule | Reuses the gate, record and deploy path that already work | Weekly cadence can lag a sudden demand shift |
-| Move scheduling from GitHub cron to AWS EventBridge Scheduler | Fires on time; GitHub dropped most runs on day one | One more AWS component, plus a token to trigger workflows |
+| Weekly retrain = the Deploy workflow on a schedule (planned) | Reuses the gate, record and deploy path that already work | Weekly cadence can lag a sudden demand shift |
+| ✅ Scheduling moved from GitHub cron to AWS EventBridge Scheduler + a dispatcher Lambda ([ADR 0009](docs/adr/0009-scheduling-on-eventbridge.md)) | Fires on time and handles DST (forecast at 10:32 ET all year); GitHub skipped runs twice in three days | A fine-grained GitHub token to rotate yearly; one more small Lambda |
 
 ### Phase 6 — Monitoring and alerts ✅
 - [x] Forecast error tracking (model, ISO day-ahead, ISO same-day, naive), daily, rolling 7/30-day
@@ -253,8 +265,8 @@ flowchart LR
 | `src/ne_demand/monitoring/` | Forecast error, drift checks, freshness, alert de-duplication, the monitoring cycle |
 | `dashboard/` | Streamlit app: Forecast and Operations pages |
 | `configs/` | Training configs, including a deliberately degraded one for the gate demo |
-| `infra/` | Terraform for AWS (state, data bucket, GitHub OIDC role, budget, ECR, Lambda API, dashboard reader, SNS alerts, watchdog) |
-| `.github/workflows/` | CI, ingest, forecast, monitor, deploy, rollback |
+| `infra/` | Terraform for AWS (state, data bucket, GitHub OIDC role, budget, ECR, Lambda API, dashboard reader, SNS alerts, watchdog, EventBridge schedules + dispatcher) |
+| `.github/workflows/` | CI, ingest, forecast, monitor, deploy, rollback (scheduled jobs are started by AWS) |
 | `docs/adr/` | Decision records |
 | `docs/incidents.md` | Incident log |
 

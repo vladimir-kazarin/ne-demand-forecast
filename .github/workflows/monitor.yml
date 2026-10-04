@@ -4,9 +4,9 @@ name: Monitor
 # de-duplicated alerts by SNS email, and a heartbeat the AWS watchdog checks.
 # The watchdog runs inside AWS, so a stalled GitHub schedule is still noticed.
 
+# Triggered hourly at :47 UTC by AWS EventBridge Scheduler via the dispatcher Lambda
+# (infra/aws/scheduling.tf, ADR 0009).
 on:
-  schedule:
-    - cron: "47 * * * *"
   workflow_dispatch:
     inputs:
       inject_shift:

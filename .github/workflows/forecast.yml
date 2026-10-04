@@ -1,12 +1,11 @@
 name: Daily forecast
 
-# Issue time is 10:30 America/New_York (ADR 0004). Cron is UTC, so run at both
-# 14:35 and 15:35 UTC; `--scheduled` skips the run that is before 10:30 local
-# or after tomorrow's forecast already exists.
+# Triggered at 10:32 America/New_York every day by AWS EventBridge Scheduler, which
+# handles daylight saving (infra/aws/scheduling.tf, ADR 0009). `--scheduled` still
+# skips a run before 10:30 local or after tomorrow's forecast exists, so manual
+# re-runs and retries are safe.
 
 on:
-  schedule:
-    - cron: "35 14,15 * * *"
   workflow_dispatch:
 
 permissions:
