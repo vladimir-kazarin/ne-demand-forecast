@@ -12,7 +12,10 @@ Locally: NE_DATA_ROOT=data uv run --extra dashboard streamlit run dashboard/app.
 
 from __future__ import annotations
 
+import json
 import os
+import urllib.error
+import urllib.request
 
 import fsspec
 import pandas as pd
@@ -21,6 +24,8 @@ import streamlit as st
 
 LOCAL_TZ = "America/New_York"
 REPO_URL = "https://github.com/vladimir-kazarin/ne-demand-forecast"
+# Public prediction API (Lambda Function URL); override with the API_URL secret.
+DEFAULT_API_URL = "https://ycw52embas2yt2mdbaucbkyt4e0upcey.lambda-url.us-east-1.on.aws"
 STALE_AFTER = pd.Timedelta(hours=24)
 
 # Reference palette, categorical slots 1-3, validated light and dark (dataviz validator).
@@ -291,6 +296,79 @@ else:
         )
         with st.expander("Table"):
             st.dataframe(table(past_series), use_container_width=True)
+
+# --- Try the model ---
+
+
+def call_api(payload: dict) -> tuple[int, dict]:
+    """POST to the live /predict endpoint. Allows for a Lambda cold start (a few seconds)."""
+    url = (_secret("API_URL") or os.environ.get("API_URL") or DEFAULT_API_URL).rstrip("/")
+    req = urllib.request.Request(
+        f"{url}/predict",
+        data=json.dumps(payload).encode(),
+        headers={"content-type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=25) as r:
+            return r.status, json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read() or b"{}")
+
+
+st.subheader("Try the model")
+st.markdown(
+    "Send a date, hour, and temperature to the live prediction API (FastAPI on AWS Lambda). "
+    "Recent demand comes from the pipeline's data, as known at that day's 10:30 ET issue time."
+)
+tomorrow_local = (now.tz_convert(LOCAL_TZ) + pd.Timedelta(days=1)).date()
+with st.form("predict"):
+    f1, f2, f3 = st.columns(3)
+    p_day = f1.date_input("Date", value=tomorrow_local)
+    p_hour = f2.selectbox(
+        "Hour (ET)",
+        range(24),
+        index=18,
+        format_func=lambda h: f"{(h % 12) or 12} {'AM' if h < 12 else 'PM'}",
+    )
+    p_temp_f = f3.number_input(
+        "Temperature (°F)", min_value=-40.0, max_value=120.0, value=60.0, step=1.0
+    )
+    submitted = st.form_submit_button("Predict")
+
+if submitted:
+    payload = {
+        "date": str(p_day),
+        "hour": int(p_hour),
+        "temperature_c": round((p_temp_f - 32) * 5 / 9, 2),
+    }
+    with st.spinner("Calling the API (the first call after a quiet spell takes a few seconds)…"):
+        try:
+            status, body = call_api(payload)
+        except (urllib.error.URLError, TimeoutError) as e:
+            status, body = 0, {"detail": str(e)}
+    if status == 200:
+        r1, r2 = st.columns(2)
+        r1.metric("Predicted demand", f"{body['forecast_mw']:,.0f} MW")
+        r2.metric(
+            "Model version",
+            body["model_version"].rpartition("/")[2],
+            help=f"{body['model_version']}, commit {body['git_commit'][:7]}",
+        )
+        missing = [
+            k.removeprefix("load_lag_") for k, ok in body["lags_available"].items() if not ok
+        ]
+        if missing:
+            st.caption(
+                f"Demand from {', '.join(missing)} earlier was not known at the issue time "
+                "for this hour, so the model predicted without it."
+            )
+    elif status == 422:
+        detail = body.get("detail")
+        st.warning(detail if isinstance(detail, str) else "Those inputs are out of range.")
+    else:
+        st.error(
+            f"The prediction API did not respond (status {status or 'n/a'}). Try again shortly."
+        )
 
 st.caption(
     "ISO-NE day-ahead is the vintage available when our forecast was issued, archived live since "
