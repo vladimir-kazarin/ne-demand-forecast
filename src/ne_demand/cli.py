@@ -177,3 +177,20 @@ def promote(
 
     do_promote(version, reason)
     typer.echo(f"production -> v{version}")
+
+
+@app.command(name="export-model")
+def export_model(
+    out: Annotated[
+        str, typer.Option(help="Directory to write the model bundle to")
+    ] = "build/model",
+) -> None:
+    """Export the production model from the registry as a bundle for the serving image."""
+    from ne_demand.serving.bundle import export_bundle
+    from ne_demand.training.tracking import load_production
+
+    booster, meta = load_production()
+    path = export_bundle(booster, meta, out)
+    typer.echo(
+        f"exported ne-demand-lightgbm/v{meta['registry_version']} ({meta['version']}) -> {path}"
+    )
