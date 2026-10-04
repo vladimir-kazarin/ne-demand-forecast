@@ -221,3 +221,14 @@ def rollback(
 
     old, new = do_rollback(Settings().ne_data_root, reason)
     typer.echo(f"production: v{old} -> v{new}")
+
+
+@app.command(name="production-version")
+def production_version_cmd() -> None:
+    """Print the registry version that currently holds the production alias."""
+    from ne_demand.training.tracking import production_version
+
+    v = production_version()
+    if v is None:
+        raise typer.Exit(1)
+    typer.echo(v)

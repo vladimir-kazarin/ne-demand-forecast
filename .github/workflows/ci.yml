@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  python:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,6 +14,30 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --locked
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run pytest
+      - name: Lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Unit tests
+        run: uv run pytest -m "not smoke"
+        env:
+          MLFLOW_DISABLE_AGENT_HINT: "1"
+      - name: Training smoke test (train, register, gate, forecast, serve on synthetic data)
+        run: uv run pytest -m smoke
+        env:
+          MLFLOW_DISABLE_AGENT_HINT: "1"
+
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+      - run: terraform fmt -check -recursive infra
+      - name: Validate
+        run: |
+          for d in infra/bootstrap infra/aws; do
+            terraform -chdir=$d init -backend=false -input=false >/dev/null
+            terraform -chdir=$d validate
+          done

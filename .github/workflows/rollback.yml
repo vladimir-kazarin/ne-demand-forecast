@@ -1,0 +1,67 @@
+name: Rollback
+
+# One click: return production to the version it replaced and point the API at
+# that version's existing image. Target: under 5 minutes, logged with a reason.
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why roll back (recorded on the model version and event log)"
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  NE_DATA_ROOT: ${{ vars.NE_DATA_ROOT }}
+  MLFLOW_TRACKING_URI: ${{ vars.MLFLOW_TRACKING_URI }}
+  MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+  MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+  MLFLOW_DISABLE_AGENT_HINT: "1"
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Start clock
+        id: clock
+        run: echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+      - run: uv sync --locked --no-dev
+      - name: Roll back the registry
+        id: registry
+        run: |
+          uv run ne-demand rollback --reason "${{ inputs.reason }}" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "version=$(uv run ne-demand production-version)" >> "$GITHUB_OUTPUT"
+      - name: Point the API at that version's image
+        run: |
+          V=${{ steps.registry.outputs.version }}
+          TAG=$(aws ecr describe-images --repository-name ne-demand-api \
+                  --query "sort_by(imageDetails,&imagePushedAt)[?imageTags && ends_with(imageTags[0], '-v$V')] | [-1].imageTags[0]" \
+                  --output text)
+          if [ -z "$TAG" ] || [ "$TAG" = "None" ]; then
+            echo "::error::no image for v$V in ECR; run the Deploy workflow with train=false"; exit 1
+          fi
+          REGISTRY=$(aws sts get-caller-identity --query Account --output text).dkr.ecr.us-east-1.amazonaws.com
+          aws lambda update-function-code --function-name ne-demand-api --image-uri "$REGISTRY/ne-demand-api:$TAG" >/dev/null
+          aws lambda wait function-updated-v2 --function-name ne-demand-api
+          echo "API now serves \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify and report time
+        run: |
+          uv run python scripts/check_api.py "${{ vars.API_URL }}" --expect-version "${{ steps.registry.outputs.version }}"
+          echo "Rollback took $(( $(date +%s) - ${{ steps.clock.outputs.start }} )) s" | tee -a "$GITHUB_STEP_SUMMARY"

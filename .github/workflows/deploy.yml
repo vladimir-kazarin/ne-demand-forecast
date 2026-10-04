@@ -1,0 +1,100 @@
+name: Deploy
+
+# On merge: train a candidate, gate it against production, then build the image
+# for whatever is production now and deploy it to the API. A rejected candidate
+# still redeploys, so code changes ship with the current production model.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "configs/**"
+      - "serving/**"
+      - "Dockerfile"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+    inputs:
+      train:
+        description: "Train and gate a candidate first"
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  NE_DATA_ROOT: ${{ vars.NE_DATA_ROOT }}
+  MLFLOW_TRACKING_URI: ${{ vars.MLFLOW_TRACKING_URI }}
+  MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+  MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+  MLFLOW_DISABLE_AGENT_HINT: "1"
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  ECR_REPOSITORY: ne-demand-api
+
+jobs:
+  train-and-gate:
+    if: github.event_name == 'push' || inputs.train
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+      - run: uv sync --locked --no-dev
+      - name: Train candidate
+        run: uv run ne-demand train | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Gate candidate against production
+        run: uv run ne-demand gate | tee -a "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: train-and-gate
+    if: always() && (needs.train-and-gate.result == 'success' || needs.train-and-gate.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+      - run: uv sync --locked --no-dev
+      - name: Export production model
+        id: model
+        run: |
+          uv run ne-demand export-model --out build/model
+          echo "version=$(uv run ne-demand production-version)" >> "$GITHUB_OUTPUT"
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}-v${{ steps.model.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+      - name: Point the API at the new image
+        run: |
+          IMAGE=${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}-v${{ steps.model.outputs.version }}
+          aws lambda update-function-code --function-name ne-demand-api --image-uri "$IMAGE" >/dev/null
+          aws lambda wait function-updated-v2 --function-name ne-demand-api
+          echo "Deployed \`$IMAGE\`" >> "$GITHUB_STEP_SUMMARY"
+      - name: Smoke test the live API
+        run: uv run python scripts/check_api.py "${{ vars.API_URL }}" --expect-version "${{ steps.model.outputs.version }}"
