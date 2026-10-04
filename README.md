@@ -5,7 +5,7 @@ unattended, with every model decision visible on a public dashboard. The operati
 the product; the forecast is its workload. Forecasts are benchmarked against ISO New England's
 own load forecast and a naive same-hour-last-week baseline.
 
-> Status: **Phase 4 done — models reach production only through the gate; rollback in about a minute.**
+> Status: **Phase 6 in progress — monitoring live (error, drift, freshness, watchdog, email alerts).**
 >
 > **[Live forecast app](https://ne-demand-forecast-njvzyctwntwcxquaahetkb.streamlit.app/)** ·
 > **[Experiments and model registry (MLflow on DagsHub)](https://dagshub.com/vladimir-kazarin/ne-demand-forecast.mlflow)** ·
@@ -99,9 +99,7 @@ flowchart TD
 
     V -->|fail| STOP["Stop and alert<br/>nothing is published"]
     RB["Rollback"] -.->|previous version| P
-    MON["Monitoring: error, drift, freshness<br/>Phase 6"]:::planned -.->|retrain| T
-
-    classDef planned stroke-dasharray: 5 5
+    MON["Monitoring: error, drift, freshness<br/>alerts by email"] -.->|informs retrain| T
 ```
 
 Every registration, gate decision, promotion and rollback is tagged on the model version and
@@ -211,16 +209,20 @@ flowchart LR
 | Move scheduling from GitHub cron to AWS EventBridge Scheduler | Fires on time; GitHub dropped most runs on day one | One more AWS component, plus a token to trigger workflows |
 
 ### Phase 6 — Monitoring and alerts
-- [ ] Forecast error tracking (model, ISO, naive)
-- [ ] Input drift with Evidently
-- [ ] Data freshness and job-failure checks
-- [ ] Slack or email alerts
-- [ ] **Done when:** an injected input shift fires an alert within one cycle
+- [x] Forecast error tracking (model, ISO day-ahead, ISO same-day, naive), daily, rolling 7/30-day
+- [x] Input drift: station consistency and out-of-range checks, calibrated on a year of real weeks; PSI/KS context and Evidently reports ([ADR 0008](docs/adr/0008-monitoring-and-drift.md))
+- [x] Data freshness and job checks, plus a watchdog Lambda in AWS that catches jobs that never start
+- [x] Email alerts through AWS SNS: once when firing, daily reminder, resolved message
+- [x] Operations page in the app: health, accuracy, model timeline, drift
+- [ ] **Done when:** an injected input shift fires an alert within one cycle (drill: `Monitor` workflow, `inject_shift=temp_boston=8`)
 
-| Planned decision | Why | Tradeoff |
+| Decision | Why | Tradeoff |
 | --- | --- | --- |
-| Data-freshness alerts, not only failure alerts | A job that never starts cannot fail, so failure alerts miss it | Thresholds must allow for normal data delays |
-| Evidently drift reports on model inputs | Explains *why* error rose (temperature regime, missing lags) | Drift is not always harmful; alerts need tuning |
+| Forecast error is the primary alarm | Actuals arrive daily, so the outcome itself can be measured | Needs 5 scored days before it can alert |
+| Drift alerts only on data faults and extrapolation, not raw PSI | Backtest: raw PSI fired 49 of 49 weeks; these checks fired 2, both real (Arctic outbreak) | A slow, real shift in weather sensitivity shows up in error first, not drift |
+| Seasonal reference (same weeks last year) | A fixed reference would alarm every change of season | Needs a year of history; one prior year is a thin baseline |
+| Own drift statistics + Evidently 0.6 reports | Explainable alerts; a familiar report for browsing | Evidently 0.7 waits on a plotly version conflict with the ISO-NE client |
+| Watchdog Lambda in AWS, not another GitHub job | A job that never starts cannot report itself; GitHub skipped most runs on day one | One more function to deploy (zip, stdlib only) |
 
 ### Phase 7 — Showcase
 - [x] Architecture diagram
@@ -248,11 +250,11 @@ flowchart LR
 | `src/ne_demand/evaluation/` | MAPE, the promotion gate, rollback, model event log |
 | `src/ne_demand/forecast/` | Daily batch forecast and the naive baseline |
 | `src/ne_demand/serving/` | FastAPI service and model bundle |
-| `src/ne_demand/monitoring/` | Alerts (error, drift, freshness in Phase 6) |
-| `dashboard/` | Streamlit prediction app |
+| `src/ne_demand/monitoring/` | Forecast error, drift checks, freshness, alert de-duplication, the monitoring cycle |
+| `dashboard/` | Streamlit app: Forecast and Operations pages |
 | `configs/` | Training configs, including a deliberately degraded one for the gate demo |
-| `infra/` | Terraform for AWS (state, data bucket, GitHub OIDC role, budget, ECR, Lambda API, dashboard reader) |
-| `.github/workflows/` | CI, ingest, forecast, deploy, rollback |
+| `infra/` | Terraform for AWS (state, data bucket, GitHub OIDC role, budget, ECR, Lambda API, dashboard reader, SNS alerts, watchdog) |
+| `.github/workflows/` | CI, ingest, forecast, monitor, deploy, rollback |
 | `docs/adr/` | Decision records |
 | `docs/incidents.md` | Incident log |
 
