@@ -61,3 +61,31 @@ resource "aws_iam_role_policy" "pipeline_data" {
   role   = aws_iam_role.pipeline.id
   policy = data.aws_iam_policy_document.pipeline_data.json
 }
+
+# Deploys: push images to the API repository and point the API function at one.
+data "aws_iam_policy_document" "pipeline_deploy" {
+  statement {
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"] # account-wide by AWS design; it only issues a docker login token
+  }
+  statement {
+    actions = [
+      "ecr:BatchCheckLayerAvailability", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart",
+      "ecr:CompleteLayerUpload", "ecr:PutImage", "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer", "ecr:DescribeImages", "ecr:ListImages",
+    ]
+    resources = [aws_ecr_repository.api.arn]
+  }
+  statement {
+    actions = [
+      "lambda:UpdateFunctionCode", "lambda:GetFunction", "lambda:GetFunctionConfiguration",
+    ]
+    resources = ["arn:aws:lambda:${var.region}:${data.aws_caller_identity.current.account_id}:function:ne-demand-api"]
+  }
+}
+
+resource "aws_iam_role_policy" "pipeline_deploy" {
+  name   = "deploy-api"
+  role   = aws_iam_role.pipeline.id
+  policy = data.aws_iam_policy_document.pipeline_deploy.json
+}

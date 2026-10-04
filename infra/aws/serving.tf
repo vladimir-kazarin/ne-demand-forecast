@@ -3,9 +3,12 @@
 # -var api_image_tag=<tag> (creates the function). Later deploys only change the tag.
 
 variable "api_image_tag" {
-  description = "Image tag in the ne-demand-api repository to run; empty skips the function"
+  description = <<-EOT
+    Image the function is created with; empty skips the function. After creation the
+    deploy workflow updates the image, and Terraform ignores it (see lifecycle below).
+  EOT
   type        = string
-  default     = ""
+  default     = "0c2a9ee-v1"
 }
 
 resource "aws_ecr_repository" "api" {
@@ -87,6 +90,12 @@ resource "aws_lambda_function" "api" {
   }
 
   depends_on = [aws_iam_role_policy_attachment.api_logs]
+
+  # CI deploys code (deploy and rollback workflows); Terraform owns everything else.
+  # Without this, every apply would roll the API back to var.api_image_tag.
+  lifecycle {
+    ignore_changes = [image_uri]
+  }
 }
 
 resource "aws_lambda_function_url" "api" {
