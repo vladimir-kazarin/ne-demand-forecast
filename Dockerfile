@@ -10,6 +10,10 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
+# Compile bytecode at build time. Lambda's filesystem is read-only, so without this
+# every cold start recompiles pandas, FastAPI and the rest from source.
+ENV UV_COMPILE_BYTECODE=1
+
 WORKDIR /app
 
 # Dependencies first (cached layer): only what serving imports, pinned to uv.lock.
@@ -24,11 +28,12 @@ RUN uv pip install --system --no-cache --no-deps .
 # One image serves exactly one model version, exported from the registry at build time.
 COPY build/model /opt/model
 
+# No readiness timeout: a Lambda cold start can exceed a few seconds, and a bad model
+# path still fails because uvicorn exits during startup.
 ENV MODEL_DIR=/opt/model \
     PYTHONUNBUFFERED=1 \
     AWS_LWA_PORT=8080 \
-    AWS_LWA_READINESS_CHECK_PATH=/health \
-    AWS_LWA_READINESS_CHECK_TIMEOUT_SECONDS=9
+    AWS_LWA_READINESS_CHECK_PATH=/health
 
 RUN useradd --create-home --uid 10001 app
 USER app
