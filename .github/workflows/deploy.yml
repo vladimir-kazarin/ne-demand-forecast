@@ -1,8 +1,8 @@
 name: Deploy
 
-# On merge: train a candidate, gate it against production, then build the image
-# for whatever is production now and deploy it to the API. A rejected candidate
-# still redeploys, so code changes ship with the current production model.
+# On merge: if model-relevant files changed, train a candidate and gate it against
+# production. Then build the image for whatever is production now and deploy it to
+# the API, so every code change ships, with the current production model.
 
 on:
   push:
@@ -45,8 +45,36 @@ env:
   ECR_REPOSITORY: ne-demand-api
 
 jobs:
+  changes:
+    # Retraining only makes sense when something that shapes the model changed:
+    # features, training, processing, validation, settings, configs, or dependencies.
+    runs-on: ubuntu-latest
+    outputs:
+      model: ${{ steps.diff.outputs.model }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "${{ github.event_name }}" != "push" ] || [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE" 2>/dev/null; then
+            echo "model=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          CHANGED=$(git diff --name-only "$BEFORE" "${{ github.sha }}")
+          echo "$CHANGED"
+          if echo "$CHANGED" | grep -qE '^(src/ne_demand/(features|training|validation)/|src/ne_demand/(processing|config)\.py$|configs/|pyproject\.toml$|uv\.lock$)'; then
+            echo "model=true" >> "$GITHUB_OUTPUT"
+            echo "Model-relevant files changed: training a candidate." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "model=false" >> "$GITHUB_OUTPUT"
+            echo "No model-relevant changes: skipping training, redeploying the current production model." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   train-and-gate:
-    if: github.event_name == 'push' || inputs.train
+    needs: changes
+    if: (github.event_name == 'push' && needs.changes.outputs.model == 'true') || (github.event_name == 'workflow_dispatch' && inputs.train)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -65,8 +93,8 @@ jobs:
         run: uv run ne-demand gate | tee -a "$GITHUB_STEP_SUMMARY"
 
   deploy:
-    needs: train-and-gate
-    if: always() && (needs.train-and-gate.result == 'success' || needs.train-and-gate.result == 'skipped')
+    needs: [changes, train-and-gate]
+    if: always() && needs.changes.result == 'success' && (needs.train-and-gate.result == 'success' || needs.train-and-gate.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
