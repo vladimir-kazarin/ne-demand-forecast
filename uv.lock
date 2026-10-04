@@ -1424,6 +1424,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyyaml" },
     { name = "s3fs" },
+    { name = "scipy" },
     { name = "tenacity" },
     { name = "typer" },
 ]
@@ -1467,6 +1468,7 @@ requires-dist = [
     { name = "pydantic-settings" },
     { name = "pyyaml" },
     { name = "s3fs" },
+    { name = "scipy", specifier = ">=1.18.1" },
     { name = "streamlit", marker = "extra == 'dashboard'" },
     { name = "tenacity", specifier = ">=9.1.4" },
     { name = "typer" },

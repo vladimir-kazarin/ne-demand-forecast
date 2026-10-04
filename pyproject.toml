@@ -17,6 +17,7 @@ dependencies = [
     "pydantic-settings",
     "pyyaml",
     "s3fs",
+    "scipy>=1.18.1",
     "tenacity>=9.1.4",
     "typer",
 ]
