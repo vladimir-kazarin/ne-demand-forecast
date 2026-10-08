@@ -117,6 +117,7 @@ resource "aws_scheduler_schedule" "jobs" {
   name                         = "ne-demand-${each.key}"
   schedule_expression          = each.value.expression
   schedule_expression_timezone = each.value.timezone
+  state                        = var.jobs_paused ? "DISABLED" : "ENABLED"
   flexible_time_window { mode = "OFF" }
 
   target {

@@ -141,6 +141,7 @@ resource "aws_scheduler_schedule" "watchdog" {
   count               = var.watchdog_schedule_enabled ? 1 : 0
   name                = "ne-demand-watchdog"
   schedule_expression = "rate(1 hour)"
+  state               = var.jobs_paused ? "DISABLED" : "ENABLED" # stale data is expected while paused
   flexible_time_window { mode = "OFF" }
   target {
     arn      = aws_lambda_function.watchdog.arn

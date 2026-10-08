@@ -30,3 +30,9 @@ variable "alert_email" {
   description = "Where budget alerts are sent (set in terraform.tfvars, which is gitignored)"
   type        = string
 }
+
+variable "jobs_paused" {
+  description = "Disable every schedule (ingest, monitor, forecast, watchdog); serving and the dashboard stay up"
+  type        = bool
+  default     = false
+}
